@@ -4,6 +4,7 @@
 > import Data.Bits
 > import Numeric
 > import Text.ParserCombinators.Parsec
+> import Text.ParserCombinators.Parsec.Prim
 
 > type Octet = Word8
 > type IPv4Address = (Octet, Octet, Octet, Octet)
@@ -15,10 +16,10 @@
 >                       deriving Show
 > data IPTablesProtocol = TCP | UDP | ICMP | All
 >                         deriving Show
-> type IPTablesDestPort = (IPTablesProtocol, Int)
+> type IPTablesDestPort = (IPTablesProtocol, [Int])
 > data IPTablesState = NEW | RELATED | ESTABLISHED | INVALID
 >                      deriving Show
-> data IPTablesExtra = DestPort IPTablesDestPort | IState IPTablesState
+> data IPTablesExtra = DestPort IPTablesDestPort | IState [IPTablesState] | None
 >                      deriving Show
 
 > toOctet :: Num a => a -> Octet
@@ -92,23 +93,40 @@
 >                      _     -> unexpected "invalid protocol"
 >                    <?> "IPTables protocol"
 
-> iptablesDestPort :: Parser IPTablesExtra
-> iptablesDestPort = space >> iptablesProtocol >>= \p ->
->                    space >> string "dpt:" >>
+> iptablesDestPort :: Parser [Int]
+> iptablesDestPort = string "dpt:" >>
 >                    many1 digit >>= \d ->
->                    return (DestPort (p, (read d)))
+>                    return [(read d)]
 >                    <?> "IPTables destination port"
 
-> iptablesState :: Parser IPTablesExtra
-> iptablesState = string " state " >>
->                 many1 letter >>= \s ->
+> iptablesDestPorts :: Parser [Int]
+> iptablesDestPorts = string "dpts:" >>
+>                     many1 digit >>= \begin ->
+>                     char ':' >>
+>                     many1 digit >>= \end ->
+>                     return [(read begin), (read end)]
+>                     <?> "IPTables destination ports"
+
+> iptablesDPort :: Parser IPTablesExtra
+> iptablesDPort = iptablesProtocol >>= \p ->
+>                 space >> ((try iptablesDestPort) <|> iptablesDestPorts) >>= \d ->
+>                 return (DestPort (p, d))
+>                 <?> "IPTables dport"
+
+> iptablesState :: Parser IPTablesState
+> iptablesState = many1 letter >>= \s ->
 >                 case s of
->                   "NEW"         -> return (IState NEW)
->                   "RELATED"     -> return (IState RELATED)
->                   "ESTABLISHED" -> return (IState ESTABLISHED)
->                   "INVALID"     -> return (IState INVALID)
+>                   "NEW"         -> return NEW
+>                   "RELATED"     -> return RELATED
+>                   "ESTABLISHED" -> return ESTABLISHED
+>                   "INVALID"     -> return INVALID
 >                   _             -> unexpected "invalid state"
 >                 <?> "IPTables state"
+
+> iptablesStates :: Parser IPTablesExtra
+> iptablesStates = string "state " >>
+>                  iptablesState `sepBy` (char ',') >>= \s ->
+>                  return (IState s)
 
 > data IPTablesRule =
 >   IPTablesRule { packets :: Integer,
@@ -134,7 +152,7 @@
 >                many1 space >> interface >>= \outInterface ->
 >                many1 space >> iptablesTarget >>= \source ->
 >                many1 space >> iptablesTarget >>= \destination ->
->                manyTill (choice [(try iptablesState), (try iptablesDestPort)]) (char '\n') >>= \e ->
+>                manyTill (choice [(many1 (char ' ') >> return None), (try iptablesStates), (try iptablesDPort)]) (char '\n') >>= \e ->
 >                return (IPTablesRule
 >                        { packets=(read packets),
 >                          bytes=(read bytes),
@@ -147,7 +165,7 @@
 >                          destination=destination,
 >                          extra=e })
 >                <?> "IPTables rule"
->     where interface = many1 (letter <|> char '*')
+>     where interface = many1 alphaNum <|> string "*"
 
 > iptablesChainHeader :: Parser String
 > iptablesChainHeader = string "Chain " >> many1 (letter) >>= \name ->
@@ -157,13 +175,14 @@
 
 > iptablesChain :: Parser (String, [IPTablesRule])
 > iptablesChain = iptablesChainHeader >>= \name ->
->                 char '\n' >> many iptablesRule >>= \rules ->
+>                 char '\n' >> many1 (noneOf "\n") >> char '\n' >>
+>                 many (try iptablesRule) >>= \rules ->
 >                 char '\n' >>
 >                 return (name, rules)
 >                 <?> "IPTables chain"
 
 > iptablesChains :: Parser [(String, [IPTablesRule])]
-> iptablesChains = many iptablesChain
+> iptablesChains = many (try iptablesChain)
 >                  <?> "IPTables listing"
 
-> main = parseTest iptablesChains
+> main = getContents >>= parseTest iptablesChains
