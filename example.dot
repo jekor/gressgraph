@@ -1,0 +1,24 @@
+digraph firajawall {
+  sxtona [shape=doubleoctagon];
+  eth0 -> sxtona [dir=none, color="#2C768D"];
+  ath0 -> sxtona [dir=none, color="#2C768D"];
+  any [label="0.0.0.0"];
+  classA [label="10.0.0.0"];
+  classB [label="172.16.0.0"];
+  classC [label="192.168.0.0"];
+  ip_192_168_3_4 [label="192.168.3.4"];
+  // ACCEPT
+  any -> ath0 [label="445", color="#16AA6A"];
+  any -> ath0 [label="139", color="#16AA6A"];
+  any -> ath0 [label="53", color="#2C768D"];
+  any -> ath0 [label="123", color="#313368"];
+  any -> sxtona [label="ssh", color="#2C768D"];
+  any -> eth0 [label="10001:10010", color="#16AA6A"];
+  ip_192_168_3_4 -> ath0 [label="631", color="#16AA6A"];
+  any -> eth0 [label="123", color="#313368"];
+  // DROP
+  edge [arrowhead=tee, style=dashed];
+  classA -> eth0;
+  classB -> eth0;
+  classC -> eth0;
+}

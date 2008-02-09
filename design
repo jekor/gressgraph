@@ -1,0 +1,23 @@
+-*- org -*-
+* domain-specific language
+* high-level functions
+* optimizable
+** ipsets could be implemented as either
+*** lists
+*** ipsets in the kernel
+* data types/grammar
+** host/ip address
+** port
+** action
+* what I'd like to be able to say
+** block all incoming packets
+** drop incoming UDP packets
+** allow in SSH
+** allow in SSH on port 2222 to necesiga port 22
+** allow all outgoing packets
+** forward packets from internal hosts
+** track FTP connections
+** combine eth0 and eth1
+** eth0 is connected to the internet
+** ath0 is connected to the LAN
+** accept established connections
