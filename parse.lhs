@@ -7,23 +7,48 @@
 > import Text.ParserCombinators.Parsec
 > import Text.ParserCombinators.Parsec.Prim
 
+We need to be able to "graph" (output in a format that Graphviz will
+understand) the INPUT chain. To do so, we can break the task of graphing down
+to each parsed type.
+
+> class Graph a where
+>     graph :: a -> IO ()
+
+Our first type is an IP address. The definition follows simply from what an IP
+address is: a group of 4 octets. It would make for less verbose code if we used
+a list of Octets rather than a quadruple, but it wouldn't be technically
+correct.
+
 > type Octet = Word8
 > type IPv4Address = (Octet, Octet, Octet, Octet)
+> instance Graph IPv4Address where
+>     graph (a, b, c, d) = putStr (show a) >> putStr "." >>
+>                          putStr (show b) >> putStr "." >>
+>                          putStr (show c) >> putStr "." >>
+>                          putStr (show d)
+
+
 > type IPv4Netmask = IPv4Address
 > type IPv4Subnet = (IPv4Address, IPv4Netmask)
+> instance Graph IPv4Subnet where
+>     graph (a, n) = graph a >> putStr "/" >> graph n
 > data IPTablesTarget = Address IPv4Address | Subnet IPv4Subnet | Hostname String
 >                       deriving Show
+> instance Graph IPTablesTarget where
+>     graph (Hostname h) = putStr h
+>     graph (Address a) = graph a
+>     graph (Subnet a) = graph a
 > data IPTablesAction = Drop | Accept
->                       deriving Show
+>                       deriving (Show, Eq)
 > data IPTablesProtocol = TCP | UDP | ICMP | All
->                         deriving Show
+>                         deriving (Show, Eq)
 > data IPTablesPort = PortNumber Int | PortName String
->                     deriving Show
+>                     deriving (Show, Eq)
 > type IPTablesDestPort = (IPTablesProtocol, (IPTablesPort, IPTablesPort))
 > data IPTablesState = NEW | RELATED | ESTABLISHED | INVALID
->                      deriving Show
+>                      deriving (Show, Eq)
 > data IPTablesExtra = DestPort IPTablesDestPort | IState [IPTablesState] | None
->                      deriving Show
+>                      deriving (Show, Eq)
 
 An identifier is any series of alphanumeric characters that doesn't start with
 a number.
@@ -144,6 +169,9 @@ a number.
 >                  destination :: IPTablesTarget,
 >                  extra :: [IPTablesExtra] }
 >   deriving Show
+> instance Graph IPTablesRule where
+>     graph r = graph (source r) >> putStr " -> " >>
+>               graph (destination r) >> putStr "\n"
 
 > iptablesRule :: Parser IPTablesRule
 > iptablesRule = many space >>
@@ -167,7 +195,7 @@ a number.
 >                          outInterface=outInterface,
 >                          source=source,
 >                          destination=destination,
->                          extra=e })
+>                          extra=(filter ((/=) None) e) })
 >     where interface = try (string "*") <|> identifier
 
 > iptablesChainHeader :: Parser String
@@ -192,11 +220,8 @@ a number.
 >                Right cs -> mapM_ graphChain cs
 
 > graphChain :: (String, [IPTablesRule]) -> IO ()
-> graphChain ("INPUT", rules) = mapM_ graphRule rules
+> graphChain ("INPUT", rules) = mapM_ graph rules
 > graphChain (_, _) = return ()
-
-> graphRule :: IPTablesRule -> IO ()
-> graphRule = print
 
 Graphviz uses a limited set of ASCII characters for node identifiers.
 
