@@ -1,60 +1,53 @@
 \documentclass[oneside]{article}
 %include polycode.fmt
 \usepackage[T1]{fontenc}
+
+\newcommand{\iptables}{{\sc IpT}ables}
+
 \begin{document}
 
-The purpose of FIXME is to help you visualize your IPTables firewall. It
-acts as a filter, translating your firewall rules from IPTables format into
+The purpose of \verb!ingressgraph! is to help you visualize your \iptables{} firewall.
+It acts as a filter, translating your firewall rules from \iptables{} format into
 Graphviz graphing instructions.
 
 You can create a simple graph of your firewall with:
 
 \begin{verbatim}
-$ iptables -L -vx | FIXME > iptables.dot
+$ iptables -L -vx | ingressgraph > iptables.dot
 $ dot -Tpng iptables.dot > iptables.png
 \end{verbatim}
 
-(You can use \verb!-Tsvg! instead of \verb!-Tpng! if you want vector output.)
-
+(Use \verb!-Tsvg! instead of \verb!-Tpng! if you want vector output.)
+\vskip 2em
 The program begins here. It's written in Haskell98 and uses Glasgow extensions.
-It's been tested with GHC 6.8.2.
+It's been tested with {\sc Ghc} 6.8.2.
 
 > module Main where
-> import Numeric
-> import Data.Word
-> import Data.Bits
-> import Data.List
+> import Data.Char
 > import Text.ParserCombinators.Parsec
 > import Text.ParserCombinators.Parsec.Prim
 
-We need to be able to "graph" (output in a format that Graphviz will
-understand) an IPTables chain. To do so, we delegate the task of graphing
-to each IPTables type.
+We need to be able to ``graph'' (output in a format that Graphviz will
+understand) an \iptables{} chain. To do so, we delegate the task of graphing
+to each \iptables{} type.
 
 > class Graph a where
 >     graph :: a -> IO ()
+
+We need some basic parsers for \iptables{} syntax. These are very permissive,
+trading simplicity for safety since we don't expect \verb!iptables! to give us
+malformed data.
 
 > identifier  ::  Parser String
 > identifier  =   many (noneOf " ,")
 >
 > delimiter  ::  Parser ()
-> delimiter  =   skipMany1 ((char ' ') <?> "")
+> delimiter  =   skipMany1 (char ' ')
 
-In IPTables you can specify either an IP address, a subnet, or a hostname as
-either the source or destination of a rule. We generalize these here with the
-|IPTablesAddress| type.
-
-> type Address = String
->
-> address  ::  Parser Address
-> address  =   identifier
->
-> instance Graph Address where
->     graph = putStr
-
-An IPTables target actually describes the action that IPTables will take. Don't
-confuse "target" with "destination". A target can be one of the 4 basic types
-(ACCEPT, DROP, QUEUE, or RETURN) or the name of another chain.
+An \iptables{} target actually describes the action that \iptables{} will take.
+Don't confuse ``target'' with ``destination''. A target can be one of the 4
+basic types ({\sc accept, drop, queue}, or {\sc queue}) or the name of another
+chain.
 
 > data Target =  Accept | Drop | Queue | Return | Chain String
 >                deriving (Show, Eq)
@@ -66,7 +59,7 @@ confuse "target" with "destination". A target can be one of the 4 basic types
 >                    "DROP"    -> return Drop
 >                    "QUEUE"   -> return Queue
 >                    "RETURN"  -> return Return
->                    _         -> return $ Chain s
+>                    _         -> return (Chain s)
 
 As with targets, there are 4 pre-defined protocols and one for protocol names.
 
@@ -80,30 +73,43 @@ As with targets, there are 4 pre-defined protocols and one for protocol names.
 >                      "udp"   -> return UDP
 >                      "icmp"  -> return ICMP
 >                      "all"   -> return All
->                      _       -> return $ Protocol s
+>                      _       -> return (Protocol s)
 
-> data Extra =    DPort DPort
->              |  MStates [MState]
->              |  None
->                 deriving (Show, Eq)
+\iptables{} allows for ``extra'' options. These are things like
+destination port, connection state, etc. This is where a lot of the meat of the
+rule is and is the (relatively) difficult part to parse.
+
+> data Extra =  DPort    DPort     |
+>               CStates  [CState]  |
+>               None
+>               deriving (Show, Eq)
 >
 > extra  ::  Parser Extra
-> extra  =   choice [(try dport), (try mstates)]
+> extra  =   choice [  (try dport    >>= return . DPort    ),
+>                      (try cstates  >>= return . CStates  )]
+>
+> extras  ::  Parser [Extra]
+> extras  =   extra `sepEndBy` delimiter
+
+A destination port has the form \verb!udp dpt:bootps! or
+\verb!tcp dpt:10000:10010!.
 
 > type DPort = (Protocol, String)
 >
-> dport  ::  Parser Extra
-> dport  =   protocol >>= \ p ->
->            delimiter >>
+> dport  ::  Parser DPort
+> dport  =   protocol >>= \ p -> delimiter >>
 >            string "dpt" >> option ' ' (char 's') >> char ':' >>
->            identifier >>= \ i ->
->            return (DPort (p, i))
+>            identifier >>= \ i -> return (p, i)
 
-> data MState =  New | Related | Established | Invalid
+A connection state can be {\sc new, related, established} or
+{\sc invalid}. It allows \iptables{} to determine whether or not to apply a
+rule by checking the connection tracking history.
+
+> data CState =  New | Related | Established | Invalid
 >                deriving (Show, Eq)
 >
-> mstate  ::  Parser MState
-> mstate  =   identifier >>= \ s ->
+> cstate  ::  Parser CState
+> cstate  =   identifier >>= \ s ->
 >             case s of
 >                    "NEW"          -> return New
 >                    "RELATED"      -> return Related
@@ -111,90 +117,111 @@ As with targets, there are 4 pre-defined protocols and one for protocol names.
 >                    "INVALID"      -> return Invalid
 >                    _              -> unexpected "invalid state"
 
-> mstates  ::  Parser Extra
-> mstates  =   string "state" >> delimiter >>
->              mstate `sepBy` (char ',') >>=
->              return . MStates
+The state can be (and often is) a list of states separated by a comma.
 
-> data Rule = Rule {  packets         :: Integer,
->                     bytes           :: Integer,
->                     action          :: Target,
->                     proto           :: Protocol,
->                     options         :: String,
->                     inInterface     :: String,
->                     outInterface    :: String,
->                     source          :: Address,
->                     destination     :: Address,
->                     extras          :: [Extra] }
->             deriving Show
+> cstates  ::  Parser [CState]
+> cstates  =   string "state" >> delimiter >>
+>              cstate `sepBy` (char ',') >>= return
+
+Here's the main unit of our graph: the \iptables{} rule. In the \verb!iptables!
+output it's almost a {\sc csv} line with spaces for delimiters, except for the
+``extra'' information.
+
+> data Rule =  Rule {  packets         :: Integer,
+>                      bytes           :: Integer,
+>                      action          :: Target,
+>                      proto           :: Protocol,
+>                      options         :: String,
+>                      inInterface     :: String,
+>                      outInterface    :: String,
+>                      source          :: String,
+>                      destination     :: String,
+>                      extraOpts       :: [Extra] }
+>              deriving Show
 >
-> instance Graph Rule where
->     graph r =  graph (source r) >> putStr " -> " >>
->                graph (destination r) >> putStr "\n"
-
 > rule  ::  Parser Rule
-> rule  =   skipMany delimiter  >> many1 digit  >>= \ packets ->
->                    delimiter  >> many1 digit  >>= \ bytes ->
->                    delimiter  >> target       >>= \ action ->
->                    delimiter  >> protocol     >>= \ protocol ->
->                    delimiter  >> identifier   >>= \ options ->
->                    delimiter  >> identifier   >>= \ inInterface ->
->                    delimiter  >> identifier   >>= \ outInterface ->
->                    delimiter  >> address      >>= \ source ->
->                    delimiter  >> address      >>= \ destination ->
->                    delimiter  >> extra `sepEndBy` delimiter >>= \ extra ->
->                    newline >>
->                    return (Rule
->                            {  packets       = (read packets),
->                               bytes         = (read bytes),
->                               action        = action,
->                               proto         = protocol,
->                               options       = options,
->                               inInterface   = inInterface,
->                               outInterface  = outInterface,
->                               source        = source,
->                               destination   = destination,
->                               extras        = extra })
+> rule  =   skipMany  delimiter  >> many1 digit  >>= \ packets       ->
+>                     delimiter  >> many1 digit  >>= \ bytes         ->
+>                     delimiter  >> target       >>= \ action        ->
+>                     delimiter  >> protocol     >>= \ protocol      ->
+>                     delimiter  >> identifier   >>= \ options       ->
+>                     delimiter  >> identifier   >>= \ inInterface   ->
+>                     delimiter  >> identifier   >>= \ outInterface  ->
+>                     delimiter  >> identifier   >>= \ source        ->
+>                     delimiter  >> identifier   >>= \ destination   ->
+>                     delimiter  >> extras       >>= \ extras        ->
+>                     newline >>
+>                     return (Rule
+>                             {  packets       = (read packets),
+>                                bytes         = (read bytes),
+>                                action        = action,
+>                                proto         = protocol,
+>                                options       = options,
+>                                inInterface   = inInterface,
+>                                outInterface  = outInterface,
+>                                source        = source,
+>                                destination   = destination,
+>                                extraOpts     = extras })
 
-> chainHeader  ::  Parser String
-> chainHeader  =   string "Chain " >> identifier >>= \name ->
->                  manyTill anyChar newline >>
->                  return name
+Graphing the |Rule| is where the magic happens.
 
-> chain  ::  Parser (String, [Rule])
+> instance Graph Rule where
+>     graph r = putStr $  nodeName (source r)       ++  " -> " ++
+>                         nodeName (destination r)  ++  "\n"
+
+A |Chain| is a named collection of rules. The rules are in order (even though
+we ignore that for graphing purposes).
+
+> type Chain = (String, [Rule])
+>
+> chain  ::  Parser Chain
 > chain  =   chainHeader >>= \name ->
 >            manyTill anyChar newline >>
 >            manyTill  rule
 >                      (newline <|> (eof >> return '\n')) >>= \rules ->
 >            return (name, rules)
+>
+> chainHeader  ::  Parser String
+> chainHeader  =   string "Chain " >> identifier >>= \name ->
+>                  manyTill anyChar newline >>
+>                  return name
 
-> chains  ::  Parser [(String, [Rule])]
+Since this is \verb!ingressgraph!, we only want to graph the {\sc input} chain.
+
+> instance Graph Chain where
+>     graph ("INPUT"  ,  rules  )  =   mapM_ graph rules
+>     graph (_        ,  _      )  =   return ()
+
+Finally, the \iptables{} output (our input) is a series of chains.
+
+> chains  ::  Parser [Chain]
 > chains  =   many1 chain
 
-> main = getContents >>= graphviz
+This program is a simple filter that accepts an \iptables{} dump as input and
+outputs a Graphviz representation.
+
+> main  ::  IO ()
+> main  =   getContents >>= graphviz
+
+|graphviz| is our filter. It applies the Parsec parser we've built up until
+this point to the string it receives (an \iptables{} dump). If there are any errors, it prints them on stderr (using Parsec's error message).
 
 TODO: How can we use lazy evaluation to graph as we parse?
 
 > graphviz    ::  String -> IO ()
 > graphviz x  =   case (parse chains "" x) of
->                 Left err  -> print err
->                 Right cs  -> mapM_ graphChain cs
+>                 Left err  -> error (show err)
+>                 Right cs  -> mapM_ graph cs
 
-> graphChain                        ::  (String, [Rule]) -> IO ()
-> graphChain ("INPUT"  ,  rules  )  =   mapM_ graph rules
-> graphChain (_        ,  _      )  =   return ()
+Graphviz uses a limited set of ASCII characters for node identifiers. We need
+to convert node names to simple alphanumeric identifiers with underscores only.
 
-Graphviz uses a limited set of ASCII characters for node identifiers.
+> nodeChar :: Char -> Char
+> nodeChar c
+>          | isAlphaNum c  =   c
+>          | otherwise     =   '_'
 
-> tr             ::  Eq a => [a] -> [(a, a)] -> [a]
-> tr  []      _  =   []
-> tr  (x:xs)  p  =   y:(tr xs p)
->     where  y    =  case rep of
->                    Nothing  -> x
->                    Just z   -> snd z
->            rep  = find (((==) x) . fst) p
-
-> nodeName    ::  String -> String
-> nodeName n  =   tr n [('.', '_')]
+> nodeName  ::  String -> String
+> nodeName  =   map nodeChar
 
 \end{document}
