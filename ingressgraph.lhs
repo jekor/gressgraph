@@ -3,6 +3,10 @@
 \usepackage[T1]{fontenc}
 
 \newcommand{\iptables}{{\sc IpT}ables}
+% lhs2TeX doesn't format the <|> (choice) operator from Parsec well. We'll use
+% the symbol used by Philip Wadler in "Comprehending Monads" to indicate the
+% "alternation" operator.
+%format <|> = "\talloblong{}"
 
 \begin{document}
 
@@ -24,6 +28,7 @@ It's been tested with {\sc Ghc} 6.8.2.
 
 > module Main where
 > import Data.Char
+> import Data.List
 > import Text.ParserCombinators.Parsec
 > import Text.ParserCombinators.Parsec.Prim
 
@@ -166,14 +171,16 @@ output it's almost a {\sc csv} line with spaces for delimiters, except for the
 Graphing the |Rule| is where the magic happens.
 
 > instance Graph Rule where
->     graph r = putStr $  nodeName (source r)       ++  " -> " ++
->                         nodeName (destination r)  ++  "\n"
+>     graph r = putStr $  quote (source r)       ++  " -> " ++
+>                         quote (destination r)  ++  "\n"
 
 A |Chain| is a named collection of rules. The rules are in order (even though
 we ignore that for graphing purposes).
 
 > type Chain = (String, [Rule])
->
+
+A chain is terminated by a newline or the end of file marker.
+
 > chain  ::  Parser Chain
 > chain  =   chainHeader >>= \name ->
 >            manyTill anyChar newline >>
@@ -186,42 +193,59 @@ we ignore that for graphing purposes).
 >                  manyTill anyChar newline >>
 >                  return name
 
-Since this is \verb!ingressgraph!, we only want to graph the {\sc input} chain.
-
-> instance Graph Chain where
->     graph ("INPUT"  ,  rules  )  =   mapM_ graph rules
->     graph (_        ,  _      )  =   return ()
-
 Finally, the \iptables{} output (our input) is a series of chains.
 
 > chains  ::  Parser [Chain]
 > chains  =   many1 chain
 
+To graph the chain, we first create nodes with labels for each of the source
+and destination addresses. To do so, we first build a list of unique sources
+and destinations.
+
+> instance Graph Chain where
+>     graph c = mapM_ graphAddress (uniqueAddresses c') >>
+>               mapM_ graph c'
+>         where c'              = snd c
+>               graphAddress a  = putStr $ (quote a) ++
+>                                 " [label=\"" ++ a ++ "\"]\n"
+
+> uniqueAddresses  ::  [Rule] -> [String]
+> uniqueAddresses  =   nub . concat . (map addresses)
+
+> addresses    ::  Rule -> [String]
+> addresses r  =   nub [(source r), (destination r)]
+
+Graphviz uses a limited set of ASCII characters for node identifiers. But it
+allows us to quote any identifier. We'll just quote everything to be safe.
+
+> quote    ::  String -> String
+> quote n  =   "\"" ++ n ++ "\""
+
 This program is a simple filter that accepts an \iptables{} dump as input and
 outputs a Graphviz representation.
 
 > main  ::  IO ()
-> main  =   getContents >>= graphviz
+> main  =   getContents >>= graphviz . parseChains
 
-|graphviz| is our filter. It applies the Parsec parser we've built up until
-this point to the string it receives (an \iptables{} dump). If there are any errors, it prints them on stderr (using Parsec's error message).
+|parseChains| applies the Parsec parser we've built up until this point to the
+string it receives (an \iptables{} dump). If there are any errors, it prints
+them on stderr (using Parsec's error message).
 
 TODO: How can we use lazy evaluation to graph as we parse?
 
-> graphviz    ::  String -> IO ()
-> graphviz x  =   case (parse chains "" x) of
->                 Left err  -> error (show err)
->                 Right cs  -> mapM_ graph cs
+> parseChains    ::  String -> [Chain]
+> parseChains x  =   case (parse chains "" x) of
+>                      Left err  -> error (show err) >> []
+>                      Right cs  -> cs
 
-Graphviz uses a limited set of ASCII characters for node identifiers. We need
-to convert node names to simple alphanumeric identifiers with underscores only.
+Since this is \verb!ingressgraph!, we only want to graph the {\sc input} chain.
 
-> nodeChar :: Char -> Char
-> nodeChar c
->          | isAlphaNum c  =   c
->          | otherwise     =   '_'
-
-> nodeName  ::  String -> String
-> nodeName  =   map nodeChar
+> graphviz     ::  [Chain] -> IO ()
+> graphviz cs  =   putStr "digraph ingressgraph {\n" >>
+>                  case c of
+>                    Just c'  -> graph c'
+>                    Nothing  -> return ()
+>                  >> putStr "}\n"
+>     where c = find ((== "INPUT") . fst) cs
 
 \end{document}
