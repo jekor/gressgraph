@@ -1,24 +1,145 @@
 digraph firajawall {
-  sxtona [shape=doubleoctagon];
-  eth0 -> sxtona [dir=none, color="#2C768D"];
-  ath0 -> sxtona [dir=none, color="#2C768D"];
-  any [label="0.0.0.0"];
-  classA [label="10.0.0.0"];
-  classB [label="172.16.0.0"];
-  classC [label="192.168.0.0"];
-  ip_192_168_3_4 [label="192.168.3.4"];
-  // ACCEPT
-  any -> ath0 [label="445", color="#16AA6A"];
-  any -> ath0 [label="139", color="#16AA6A"];
-  any -> ath0 [label="53", color="#2C768D"];
-  any -> ath0 [label="123", color="#313368"];
-  any -> sxtona [label="ssh", color="#2C768D"];
-  any -> eth0 [label="10001:10010", color="#16AA6A"];
-  ip_192_168_3_4 -> ath0 [label="631", color="#16AA6A"];
-  any -> eth0 [label="123", color="#313368"];
-  // DROP
-  edge [arrowhead=tee, style=dashed];
-  classA -> eth0;
-  classB -> eth0;
-  classC -> eth0;
+  graph [rankdir=LR bgcolor="#808080"]
+
+  // Interfaces
+  subgraph clusterInInterfaces {
+    label="external"
+    style=solid color="#000000"
+    "iany" [label="any"]
+    "ieth0" [label="eth0"]
+    "ieth1" [label="eth1"]
+    "iath0" [label="ath0"]
+    "ilo" [label="lo"]
+  }
+  subgraph clusterOutInterfaces {
+    label="internal"
+    style=solid color="#000000"
+    "oany" [label="any"]
+    "oeth0" [label="eth0"]
+    "oeth1" [label="eth1"]
+    "oath0" [label="ath0"]
+  }
+
+  // Addresses
+  "iany_anywhere" [label="anywhere"]
+  "oany_anywhere" [label="anywhere"]
+  "iath0_anywhere" [label="anywhere"]
+  "ieth0_anywhere" [label="anywhere"]
+  "ieth1_anywhere" [label="anywhere"]
+  "ilo_anywhere" [label="anywhere"]
+  "ieth0_10.0.0.0/8" [label="10.0.0.0/8"]
+  "ieth0_172.16.0.0/255.250.0.0" [label="172.16.0.0/255.250.0.0"]
+  "ieth0_192.168.0.0/16" [label="192.168.0.0/16"]
+  "iath0_carrie" [label="carrie"]
+  "iath0_malglata" [label="malglata"]
+  "iath0_necesiga" [label="necesiga"]
+
+  // Rules
+  edge [color="#0000FF", fontcolor="#0000FF"]
+  "iany_anywhere" -> "iany" [label="INVALID"]
+  "iany" -> "oany" -> "oany_anywhere" [style=dashed fillcolor="#808080"]
+
+  edge [color="#00FFFF", fontcolor="#00FFFF"]
+  "ieth0_172.16.0.0/255.250.0.0" -> "ieth0"
+  "ieth0" -> "oany" -> "oany_anywhere" [style=dashed]
+  
+  edge [color="#00FF00", fontcolor="#00FF00"]
+  "ieth0_10.0.0.0/8" -> "ieth0"
+  "ieth0" -> "oany" -> "oany_anywhere" [style=dashed]
+
+  edge [color="#FF0000", fontcolor="#FF0000"]
+  "iath0_anywhere" -> "iath0" [label="tcp:microsoft-ds"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FFFF00", fontcolor="#FFFF00"]
+  "ieth0_192.168.0.0/16" -> "ieth0"
+  "ieth0" -> "oany" -> "oany_anywhere" [style=dashed]
+
+  edge [color="#FF00FF", fontcolor="#FF00FF"]
+  "iany_anywhere" -> "iany" [label="RELATED,ESTABLISHED"]
+  "iany" -> "oany" -> "oany_anywhere"
+
+  edge [color="#0000FF", fontcolor="#0000FF"]
+  "iath0_anywhere" -> "iath0" [label="udp:bootps"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#00FF00", fontcolor="#00FF00"]
+  "ilo_anywhere" -> "ilo"
+  "ilo" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FF0000", fontcolor="#FF0000"]
+  "iany_anywhere" -> "iany" [label="tcp:ssh NEW"]
+  "iany" -> "oany" -> "oany_anywhere"
+
+  edge [color="#00FFFF", fontcolor="#00FFFF"]
+  "iath0_anywhere" -> "iath0" [label="udp:bootps"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FFFF00", fontcolor="#FFFF00"]
+  "iath0_anywhere" -> "iath0" [label="tcp:netbios-ssn"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FF00FF", fontcolor="#FF00FF"]
+  "iath0_anywhere" -> "iath0" [label="tcp:domain"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#0000FF", fontcolor="#0000FF"]
+  "iath0_anywhere" -> "iath0" [label="udp:domain"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#00FF00", fontcolor="#00FF00"]
+  "iath0_anywhere" -> "iath0" [label="udp:ntp"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FF0000", fontcolor="#FF0000"]
+  "ieth0_anywhere" -> "ieth0" [label="tcp:10001-10010"]
+  "ieth0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#00FFFF", fontcolor="#00FFFF"]
+  "iath0_carrie" -> "iath0" [label="tcp:ipp NEW"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FFFF00", fontcolor="#FFFF00"]
+  "ieth0_anywhere" -> "ieth0" [label="udp:ntp"]
+  "ieth0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#0000FF", fontcolor="#0000FF"]
+  "ieth1_anywhere" -> "ieth1" [label="udp:bootps"]
+  "ieth1" -> "oany" -> "oany_anywhere"
+
+  edge [color="#00FF00", fontcolor="#00FF00"]
+  "ieth1_anywhere" -> "ieth1" [label="udp:domain"]
+  "ieth1" -> "oany" -> "oany_anywhere"
+
+  edge [color="#FF0000", fontcolor="#FF0000"]
+  "ieth1_anywhere" -> "ieth1" [label="tcp:domain"]
+  "ieth1" -> "oany" -> "oany_anywhere"
+
+  edge [color="#00FFFF", fontcolor="#00FFFF"]
+  "iath0_malglata" -> "iath0" [label="udp:ntp"]
+  "iath0" -> "oany" -> "oany_anywhere"
+
+  edge [color="#0000FF", fontcolor="#0000FF"]
+  "oany_anywhere" -> "oany" [label="NEW,RELATED,ESTABLISHED"]
+  "oany" -> "iany" -> "iany_anywhere"
+
+  edge [color="#00FF00", fontcolor="#00FF00"]
+  "oany_anywhere" -> "oath0"
+  "oath0" -> "ieth0" -> "ieth0_anywhere"
+
+  edge [color="#FF0000", fontcolor="#FF0000"]
+  "oany_anywhere" -> "oeth1"
+  "oeth1" -> "ieth0" -> "ieth0_anywhere"
+
+  edge [color="#FF00FF", fontcolor="#FF00FF"]
+  "oany_anywhere" -> "oath0"
+  "oath0" -> "iath0" -> "iath0_carrie"
+
+  edge [color="#FFFF00", fontcolor="#FFFF00"]
+  "oany_anywhere" -> "oath0"
+  "oath0" -> "iath0" -> "iath0_necesiga"
+
+  edge [color="#00FFFF", fontcolor="#00FFFF"]
+  "oany_anywhere" -> "oath0"
+  "oath0" -> "iath0" -> "iath0_malglata"
 }

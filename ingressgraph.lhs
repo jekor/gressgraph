@@ -205,9 +205,11 @@ and destinations.
 > instance Graph Chain where
 >     graph c = mapM_ graphAddress (uniqueAddresses c') >>
 >               mapM_ graph c'
->         where c'              = snd c
->               graphAddress a  = putStr $ (quote a) ++
->                                 " [label=\"" ++ a ++ "\"]\n"
+>         where c'                = snd c
+>               graphAddress a    = putStr $ (quote a) ++
+>                                   " [label=\"" ++ a ++ "\"]\n"
+>               graphInterface i  = putStr $ (quote i) ++
+>                                   " -> localhost [dir=none, color=\"#2C768D\"]\n"
 
 > uniqueAddresses  ::  [Rule] -> [String]
 > uniqueAddresses  =   nub . concat . (map addresses)
@@ -241,11 +243,23 @@ TODO: How can we use lazy evaluation to graph as we parse?
 Since this is \verb!ingressgraph!, we only want to graph the {\sc input} chain.
 
 > graphviz     ::  [Chain] -> IO ()
-> graphviz cs  =   putStr "digraph ingressgraph {\n" >>
->                  case c of
->                    Just c'  -> graph c'
->                    Nothing  -> return ()
->                  >> putStr "}\n"
->     where c = find ((== "INPUT") . fst) cs
+> graphviz cs  =   mapM_ putStr
+>                  ["digraph ingressgraph {\n",
+>                   "graph [rankdir=LR bgcolor=\"#808080\"]\n",
+>                   "// Interfaces\n",
+>                   "subgraph clusterInInterfaces {\n",
+>                   "style=solid color=\"#000000\" label=\"external\"\n",
+>                   concat (map graphInInterface (nub (getMembers inInterface cs))),
+>                   "}\n",
+>                   "subgraph clusterOutInterfaces {\n",
+>                   "style=solid color=\"#000000\" label=\"internal\"\n",
+>                   concat (map graphOutInterface (nub (getMembers outInterface cs))),
+>                   "}\n"]
+>     where
+>       graphInInterface i   = "\"i" ++ i ++ "\" [label=\"" ++ i ++ "\"]\n"
+>       graphOutInterface o  = "\"o" ++ o ++ "\" [label=\"" ++ o ++ "\"]\n"
+
+> getMembers       ::  (Rule -> a) -> [Chain] -> [a]
+> getMembers f cs  =   concat (map (map f . snd) cs)
 
 \end{document}
