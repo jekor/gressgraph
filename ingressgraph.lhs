@@ -202,14 +202,25 @@ To graph the chain, we first create nodes with labels for each of the source
 and destination addresses. To do so, we first build a list of unique sources
 and destinations.
 
+> rainbowPalette  ::  [String]
+> rainbowPalette  =   concat $ repeat ["#FF0000", "#FF6600", "#FFFF00", "#00FF00", "#0000FF", "#4B0082", "#8B00FF"]
+
 > instance Graph Chain where
->     graph c = mapM_ graphAddress (uniqueAddresses c') >>
->               mapM_ graph c'
->         where c'                = snd c
->               graphAddress a    = putStr $ (quote a) ++
->                                   " [label=\"" ++ a ++ "\"]\n"
->               graphInterface i  = putStr $ (quote i) ++
->                                   " -> localhost [dir=none, color=\"#2C768D\"]\n"
+>     graph (name, rs) = mapM_ putStr (concat (transpose [headers, edges]))
+>         where headers  = map (\x -> "\nedge [color=\"" ++ x ++ "\" fontcolor=\"" ++ x ++ "\"]\n") (take n rainbowPalette)
+>               edges    = map graphRule rs
+>               n        = length rs
+
+> graphRule    ::  Rule -> String
+> graphRule r  =   (quote from) ++ " -> " ++ (quote ini) ++ " [label=\"" ++ extra ++ "\"]\n" ++
+>                  (quote ini) ++ " -> " ++ (quote outi) ++ " -> " ++ (quote to) ++ "\n"
+>     where from   = ini   ++ "_" ++ (source       r)
+>           to     = outi  ++ "_" ++ (destination  r)
+>           ini    = "i" ++ (inInterface   r)
+>           outi   = "o" ++ (outInterface  r)
+>           extra  = intercalate " " (map extra' (extraOpts r))
+>           extra' (DPort    (p, s))   = (show p) ++ ":" ++ s
+>           extra' (CStates  ss)       = intercalate "," (map show ss)
 
 > uniqueAddresses  ::  [Rule] -> [String]
 > uniqueAddresses  =   nub . concat . (map addresses)
@@ -249,15 +260,26 @@ Since this is \verb!ingressgraph!, we only want to graph the {\sc input} chain.
 >                   "// Interfaces\n",
 >                   "subgraph clusterInInterfaces {\n",
 >                   "style=solid color=\"#000000\" label=\"external\"\n",
->                   concat (map graphInInterface (nub (getMembers inInterface cs))),
+>                   concat (map graphInInterface (nub inInterfaces)),
 >                   "}\n",
 >                   "subgraph clusterOutInterfaces {\n",
 >                   "style=solid color=\"#000000\" label=\"internal\"\n",
->                   concat (map graphOutInterface (nub (getMembers outInterface cs))),
->                   "}\n"]
+>                   concat (map graphOutInterface (nub outInterfaces)),
+>                   "}\n",
+>                   "// Addresses\n",
+>                   concat (map graphSource       (nub (zip inInterfaces sources))),
+>                   concat (map graphDestination  (nub (zip outInterfaces destinations))),
+>                   "// Rules"] >>
+>                  mapM_ graph cs >> putStr "}\n"
 >     where
->       graphInInterface i   = "\"i" ++ i ++ "\" [label=\"" ++ i ++ "\"]\n"
+>       graphInInterface  i  = "\"i" ++ i ++ "\" [label=\"" ++ i ++ "\"]\n"
 >       graphOutInterface o  = "\"o" ++ o ++ "\" [label=\"" ++ o ++ "\"]\n"
+>       graphSource       (i, s)  = "\"i" ++ i ++ "_" ++ s ++ "\" [label=\"" ++ s ++ "\"]\n"
+>       graphDestination  (o, d)  = "\"o" ++ o ++ "_" ++ d ++ "\" [label=\"" ++ d ++ "\"]\n"
+>       inInterfaces   = getMembers inInterface   cs
+>       outInterfaces  = getMembers outInterface  cs
+>       sources        = getMembers source        cs
+>       destinations   = getMembers destination   cs
 
 > getMembers       ::  (Rule -> a) -> [Chain] -> [a]
 > getMembers f cs  =   concat (map (map f . snd) cs)
