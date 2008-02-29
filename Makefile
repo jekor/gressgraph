@@ -1,8 +1,8 @@
-PROGRAM = ingressgraph
+PROGRAM = gressgraph
 
 all : $(PROGRAM)
 
-ingressgraph : $(PROGRAM).lhs
+gressgraph : $(PROGRAM).lhs
 	ghc -package parsec -fglasgow-exts -o $(PROGRAM) $<
 
 pdf : $(PROGRAM).lhs

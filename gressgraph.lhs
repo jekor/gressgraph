@@ -10,7 +10,7 @@
 
 \begin{document}
 
-The purpose of \verb!ingressgraph! is to help you visualize your \iptables{} firewall.
+The purpose of \verb!gressgraph! is to help you visualize your \iptables{} firewall.
 It acts as a filter, translating your firewall rules from \iptables{} format into
 Graphviz graphing instructions.
 
@@ -202,22 +202,25 @@ To graph the chain, we first create nodes with labels for each of the source
 and destination addresses. To do so, we first build a list of unique sources
 and destinations.
 
-> rainbowPalette  ::  [String]
-> rainbowPalette  =   concat $ repeat ["#FF0000", "#FF6600", "#FFFF00", "#00FF00", "#0000FF", "#4B0082", "#8B00FF"]
+> rainbowPalette = ["#9E0142", "#D53E4F", "#F46D43", "#FDAE61", "#FEE08B", "#FFFFBF",
+>                   "#E6F598", "#ABDDA4", "#66C2A5", "#3288BD", "#5E4FA2"]
+
+> rainbow  ::  [String]
+> rainbow  =   concat $ repeat rainbowPalette
 
 > instance Graph Chain where
 >     graph (name, rs) = mapM_ putStr (concat (transpose [headers, edges]))
->         where headers  = map (\x -> "\nedge [color=\"" ++ x ++ "\" fontcolor=\"" ++ x ++ "\"]\n") (take n rainbowPalette)
->               edges    = map graphRule rs
+>         where headers  = map (\x -> "\nedge [color=\"" ++ x ++ "\" fontcolor=\"" ++ x ++ "\"]\n") (take n rainbow)
+>               edges    = map (graphRule name) rs
 >               n        = length rs
 
-> graphRule    ::  Rule -> String
-> graphRule r  =   (quote from) ++ " -> " ++ (quote ini) ++ " [label=\"" ++ extra ++ "\"]\n" ++
->                  (quote ini) ++ " -> " ++ (quote outi) ++ " -> " ++ (quote to) ++ "\n"
+> graphRule      ::  String -> Rule -> String
+> graphRule n r  =   (quote from) ++ " -> " ++ (quote ini) ++ " [label=\"" ++ extra ++ "\"]\n" ++
+>                    (quote ini) ++ " -> " ++ (quote outi) ++ " -> " ++ (quote to) ++ "\n"
 >     where from   = ini   ++ "_" ++ (source       r)
 >           to     = outi  ++ "_" ++ (destination  r)
->           ini    = "i" ++ (inInterface   r)
->           outi   = "o" ++ (outInterface  r)
+>           ini    = inInterface   r
+>           outi   = outInterface  r
 >           extra  = intercalate " " (map extra' (extraOpts r))
 >           extra' (DPort    (p, s))   = (show p) ++ ":" ++ s
 >           extra' (CStates  ss)       = intercalate "," (map show ss)
@@ -251,33 +254,30 @@ TODO: How can we use lazy evaluation to graph as we parse?
 >                      Left err  -> error (show err) >> []
 >                      Right cs  -> cs
 
-Since this is \verb!ingressgraph!, we only want to graph the {\sc input} chain.
-
 > graphviz     ::  [Chain] -> IO ()
 > graphviz cs  =   mapM_ putStr
->                  ["digraph ingressgraph {\n",
->                   "graph [rankdir=LR bgcolor=\"#808080\"]\n",
+>                  ["digraph gressgraph {\n",
+>                   "graph [ranksep=3 bgcolor=\"#808080\"]\n",
+>                   "// Invisible root node\n",
+>                   "rootNode [root=true style=invis]\n",
 >                   "// Interfaces\n",
->                   "subgraph clusterInInterfaces {\n",
->                   "style=solid color=\"#000000\" label=\"external\"\n",
->                   concat (map graphInInterface (nub inInterfaces)),
+>                   "{ rank=same\n",
+>                   concat (map graphInterface interfaces),
 >                   "}\n",
->                   "subgraph clusterOutInterfaces {\n",
->                   "style=solid color=\"#000000\" label=\"internal\"\n",
->                   concat (map graphOutInterface (nub outInterfaces)),
->                   "}\n",
+>                   concat (map graphToRoot interfaces),
 >                   "// Addresses\n",
->                   concat (map graphSource       (nub (zip inInterfaces sources))),
->                   concat (map graphDestination  (nub (zip outInterfaces destinations))),
+>                   concat (map graphAddress addressPairs),
 >                   "// Rules"] >>
 >                  mapM_ graph cs >> putStr "}\n"
 >     where
->       graphInInterface  i  = "\"i" ++ i ++ "\" [label=\"" ++ i ++ "\"]\n"
->       graphOutInterface o  = "\"o" ++ o ++ "\" [label=\"" ++ o ++ "\"]\n"
->       graphSource       (i, s)  = "\"i" ++ i ++ "_" ++ s ++ "\" [label=\"" ++ s ++ "\"]\n"
->       graphDestination  (o, d)  = "\"o" ++ o ++ "_" ++ d ++ "\" [label=\"" ++ d ++ "\"]\n"
+>       graphInterface i = (quote i) ++ "\n"
+>       graphAddress (i, a) = (quote (i ++ "_" ++ a)) ++ " [label=\"" ++ a ++ "\"]\n"
+>       graphToRoot i = (quote i) ++ " -> rootNode [style=invis]\n"
+>       interfaces = nub (inInterfaces ++ outInterfaces)
 >       inInterfaces   = getMembers inInterface   cs
 >       outInterfaces  = getMembers outInterface  cs
+>       addresses = nub (sources ++ destinations)
+>       addressPairs = nub $ (zip inInterfaces sources) ++ (zip outInterfaces destinations)
 >       sources        = getMembers source        cs
 >       destinations   = getMembers destination   cs
 
