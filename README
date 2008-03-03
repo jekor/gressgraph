@@ -1,0 +1,69 @@
+gressgraph
+
+2008-03-02
+
+Description
+===========
+Visualize your firewall by graphing its rules. (See the example graph if this
+doesn't make sense yet.)
+
+Author
+======
+name:  Chris Forno (jekor)
+email: chris@forno.us
+
+I welcome your comments and suggestions.
+
+You can find the latest version of this software at <http://jekor.com/gressgraph/>.
+
+Requirements
+============
+* Graphviz
+* iptables
+
+If compiling from source:
+* GHC     (>= 6.8.2)
+* lhs2TeX (>= 1.11)
+* GNU Make
+
+Usage
+=====
+
+$ iptables -L -vx | ingressgraph > iptables.twopi
+$ twopi -Tsvg iptables.twopi > iptables.svg
+
+See gressgraph.pdf for more detailed documentation, including a description of
+the program source. If you cannot create a gressgraph.pdf file (with make doc),
+you can download it from <http://jekor.com/gressgraph/gressgraph.pdf>.
+
+Note: There are no commandline options. Also, I've only tested the program
+on my own simple iptables ruleset. It's likely that it will fail to parse your
+rules.
+
+If you want gressgraph to support your ruleset, send me the output of
+iptables -L -vx on your machine.
+
+Building
+========
+
+$ make
+$ make test
+
+Or if you want to build components individually:
+
+$ make gressgraph
+$ make doc
+
+Manifest
+========
+gressgraph.lhs       - the literate Haskell source to the program
+test-iptables-output - example iptables output (used for testing the program)
+Makefile             - a GNU makefile for building the components
+COPYING              - the text to the GNU GPLv3
+
+Modifications
+=============
+Included in this archive is my _darcs directory. I'd be happy to consider any
+patches you send me.
+
+See COPYING for license details.

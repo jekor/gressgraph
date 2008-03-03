@@ -14,11 +14,10 @@ Chain INPUT (policy DROP 1226127 packets, 148780906 bytes)
   250743 16275259 ACCEPT     udp  --  ath0   any     anywhere             anywhere            state NEW udp dpt:domain 
     4253   323228 ACCEPT     udp  --  ath0   any     anywhere             anywhere            udp dpt:ntp 
   144691  7305519 ACCEPT     tcp  --  eth0   any     anywhere             anywhere            tcp dpts:10001:10010 state NEW 
-      75     4784 ACCEPT     tcp  --  ath0   any     carrie               anywhere            tcp dpt:ipp state NEW 
+      75     4784 ACCEPT     tcp  --  ath0   any     neo                  anywhere            tcp dpt:ipp state NEW 
        0        0 ACCEPT     udp  --  eth0   any     anywhere             anywhere            udp dpt:ntp 
       73    41304 ACCEPT     udp  --  eth1   any     anywhere             anywhere            udp dpt:bootps 
       14      939 ACCEPT     udp  --  eth1   any     anywhere             anywhere            udp dpt:domain 
-       0        0 ACCEPT     udp  --  eth1   any     anywhere             anywhere            udp dpt:domain 
        0        0 ACCEPT     tcp  --  eth1   any     anywhere             anywhere            tcp dpt:domain 
        0        0 ACCEPT     udp  --  eth1   any     anywhere             anywhere            udp dpt:ntp 
        0        0 ACCEPT     tcp  --  ath0   any     malglata             anywhere            state NEW 
@@ -28,7 +27,7 @@ Chain FORWARD (policy DROP 209896 packets, 11331181 bytes)
 191412264 130555797638 ACCEPT     all  --  any    any     anywhere             anywhere            state RELATED,ESTABLISHED 
  2457788 184396099 ACCEPT     all  --  ath0   eth0    anywhere             anywhere            
        8      576 ACCEPT     all  --  ath0   ath0    necesiga             anywhere            
-      14     1088 ACCEPT     all  --  ath0   ath0    carrie               anywhere            
+      14     1088 ACCEPT     all  --  ath0   ath0    neo                  anywhere            
      117     5616 ACCEPT     all  --  ath0   ath0    malglata             anywhere            
     5786   472056 ACCEPT     all  --  eth1   eth0    anywhere             anywhere            
 
