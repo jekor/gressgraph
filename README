@@ -61,9 +61,12 @@ test-iptables-output - example iptables output (used for testing the program)
 Makefile             - a GNU makefile for building the components
 COPYING              - the text to the GNU GPLv3
 
-Modifications
-=============
-Included in this archive is my _darcs directory. I'd be happy to consider any
-patches you send me.
+Modifications/Source
+====================
+You can checkout the latest source with:
+
+$ darcs http://jekor.com/gressgraph/
+
+I'd be happy to consider any changes you send me.
 
 See COPYING for license details.
