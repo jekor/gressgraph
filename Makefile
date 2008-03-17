@@ -1,6 +1,6 @@
 PROGRAM = gressgraph
 
-all : $(PROGRAM) doc
+all : $(PROGRAM)
 
 gressgraph : $(PROGRAM).lhs
 	ghc -package parsec -fglasgow-exts -o $(PROGRAM) $<
