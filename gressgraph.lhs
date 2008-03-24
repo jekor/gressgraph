@@ -19,8 +19,9 @@
 %include polycode.fmt
 \usepackage[T1]{fontenc}
 
-\author{Chris Forno (jekor)}
 \title{gressgraph}
+\author{Chris Forno (jekor)}
+\date{March 15, 2008}
 
 % lhs2TeX doesn't format the <|> (choice) operator from Parsec well. We'll use
 % the symbol used by Philip Wadler in "Comprehending Monads" to indicate the
