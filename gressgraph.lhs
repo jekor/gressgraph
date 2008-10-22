@@ -19,9 +19,9 @@
 %include polycode.fmt
 \usepackage[T1]{fontenc}
 
-\title{gressgraph}
+\title{gressgraph v0.2}
 \author{Chris Forno (jekor)}
-\date{March 15, 2008}
+\date{October 21, 2008}
 
 % lhs2TeX doesn't format the <|> (choice) operator from Parsec well. We'll use
 % the symbol used by Philip Wadler in "Comprehending Monads" to indicate the
@@ -55,18 +55,16 @@ We'll be using Parsec for parsing the iptables output.
 > import Text.ParserCombinators.Parsec
 > import Text.ParserCombinators.Parsec.Prim
 
+> gressgraphVersion  ::  Float
+> gressgraphVersion  =   0.2
+
 We need some basic parsers for iptables syntax. These are very permissive,
 trading simplicity for safety since we don't expect to receive malformed data.
 
 An identifier is any sequence of characters, except for a space or comma.
 
 > identifier  ::  Parser String
-> identifier  =   many (noneOf " ,")
-
-A delimiter is one or more spaces.
-
-> delimiter  ::  Parser ()
-> delimiter  =   skipMany1 (char ' ')
+> identifier  =   many1 $ noneOf " ,\n"
 
 Graphviz uses a limited set of {\sc ascii} characters for node identifiers. But it
 allows us to quote any identifier. We'll just quote everything to be safe.
@@ -115,12 +113,14 @@ parse errors.
 > data Extra =  DPort DPort | CStates [CState] | None
 >               deriving Eq
 >
+
 > extra  ::  Parser Extra
 > extra  =   choice [  (try dport    >>= return . DPort    ),
->                      (try cstates  >>= return . CStates  )]
+>                      (try cstates  >>= return . CStates  ),
+>                      (try (many1 $ noneOf " \n") >> return None) ]
 >
 > extras  ::  Parser [Extra]
-> extras  =   extra `sepEndBy` delimiter
+> extras  =   extra `sepEndBy` (many1 $ char ' ')
 
 A destination port has the form \verb!udp dpt:bootps! or
 \verb!tcp dpt:10000:10010!.
@@ -128,9 +128,11 @@ A destination port has the form \verb!udp dpt:bootps! or
 > type DPort = (Protocol, String)
 >
 > dport  ::  Parser DPort
-> dport  =   protocol >>= \ p -> delimiter >>
->            string "dpt" >> option ' ' (char 's') >> char ':' >>
->            identifier >>= \ i -> return (p, i)
+> dport  =   do  p <- protocol
+>                spaces >> string "dpt"
+>                option ' ' (char 's') >> char ':'
+>                i <- identifier
+>                return (p, i)
 
 A connection state can be {\sc new, related, established} or
 {\sc invalid}. It allows iptables to determine whether or not to apply a
@@ -151,7 +153,7 @@ rule by checking the connection tracking history.
 The state can be (and often is) a list of states separated by a comma.
 
 > cstates  ::  Parser [CState]
-> cstates  =   string "state" >> delimiter >>
+> cstates  =   string "state" >> spaces >>
 >              cstate `sepBy` (char ',') >>=
 >              return
 
@@ -172,6 +174,7 @@ states separated by commas.
 > instance Show Extra where
 >     show (DPort    (p,ps)  )  = (show p) ++ ":" ++ ps
 >     show (CStates  ss      )  = intercalate "," (map show ss)
+>     show _                    = ""
 
 Here's the main unit of our graph: the iptables rule. In the \verb!iptables!
 output it's almost a {\sc csv} line with spaces for delimiters, except for the
@@ -189,29 +192,30 @@ output it's almost a {\sc csv} line with spaces for delimiters, except for the
 >                      extraOpts       :: [Extra] }
 >              deriving Show
 >
+>
 > rule  ::  Parser Rule
-> rule  =   skipMany  delimiter  >> many1 digit  >>= \ packets       ->
->                     delimiter  >> many1 digit  >>= \ bytes         ->
->                     delimiter  >> target       >>= \ action        ->
->                     delimiter  >> protocol     >>= \ protocol      ->
->                     delimiter  >> identifier   >>= \ options       ->
->                     delimiter  >> identifier   >>= \ inInterface   ->
->                     delimiter  >> identifier   >>= \ outInterface  ->
->                     delimiter  >> identifier   >>= \ source        ->
->                     delimiter  >> identifier   >>= \ destination   ->
->                     delimiter  >> extras       >>= \ extras        ->
->                     newline >>
->                     return (Rule
->                             {  packets       = (read packets),
->                                bytes         = (read bytes),
->                                action        = action,
->                                proto         = protocol,
->                                options       = options,
->                                inInterface   = inInterface,
->                                outInterface  = outInterface,
->                                source        = source,
->                                destination   = destination,
->                                extraOpts     = extras })
+> rule  =   spaces   >> many1 digit  >>= \ packets'   ->
+>           spaces   >> many1 digit  >>= \ bytes'     ->
+>           spaces   >> target       >>= \ action'    ->
+>           spaces   >> protocol     >>= \ protocol'  ->
+>           spaces   >> identifier   >>= \ options'   ->
+>           spaces   >> identifier   >>= \ inInt      ->
+>           spaces   >> identifier   >>= \ outInt     ->
+>           spaces   >> identifier   >>= \ source'    ->
+>           spaces   >> identifier   >>= \ dest       ->
+>           (many $ char ' ') >> extras  >>= \ extras'    ->
+>           newline  >>
+>           return (Rule
+>                   {  packets       = (read packets'),
+>                      bytes         = (read bytes'),
+>                      action        = action',
+>                      proto         = protocol',
+>                      options       = options',
+>                      inInterface   = inInt,
+>                      outInterface  = outInt,
+>                      source        = source',
+>                      destination   = dest,
+>                      extraOpts     = extras' })
 
 Each rule is graphed as 3 edges:
 % TODO: It would be nice to have a mini graph of what this means here.
@@ -230,22 +234,22 @@ We can break graphing a chain down into 3 parts.
 \end{enumerate}
 
 > showRule           ::  String -> (Color, Rule) -> String
-> showRule n (c, r)  =   unlines
+> showRule _ (c, r)  =   unlines
 >                        [ header,
->                          from  ++ " -> " ++ inI ++ label,
+>                          from  ++ " -> " ++ inI ++ label',
 >                          inI   ++ " -> " ++ outI ++ " -> " ++ to ]
 >     where  from       =  showAddress (inInterface   r, source       r)
 >            to         =  showAddress (outInterface  r, destination  r)
 >            inI        =  quote (inInterface   r)
 >            outI       =  quote (outInterface  r)
->            extra      =  intercalate " " (map show (extraOpts r))
+>            extra'     =  intercalate " " (map show (extraOpts r))
 >            arrowhead  =  case action r of
->                            Drop       -> " arrowhead=tee"
->                            otherwise  -> " arrowhead=normal"
+>                            Drop  -> " arrowhead=tee"
+>                            _     -> " arrowhead=normal"
 >            header     =  "edge [color=\""  ++ c ++ "\" "   ++
 >                          "fontcolor=\""    ++ c ++ "\" "  ++
 >                          arrowhead ++ "]"
->            label      =  " [label=\"" ++ extra ++ "\"]"
+>            label'     =  " [label=\"" ++ extra' ++ "\"]"
 
 Some addresses have the same name but are conceptually different. A good
 example is ``anywhere''. ``Anywhere'' means a different thing depending on which
@@ -265,15 +269,15 @@ we ignore that for graphing purposes).
 A chain is terminated by a newline or the end of file marker.
 
 > chain  ::  Parser Chain
-> chain  =   chainHeader >>= \name ->
->            manyTill anyChar newline >>
->            manyTill rule (newline <|> (eof >> return '\n')) >>= \rules ->
->            return (name, rules)
+> chain  =   do name <- chainHeader
+>               rules <- manyTill rule (newline <|> (eof >> return '\n'))
+>               return (name, rules)
 
 We ignore all of the information in the chain header except for its name.
 
 > chainHeader  ::  Parser String
 > chainHeader  =   string "Chain " >> identifier >>= \name ->
+>                  manyTill anyChar newline >>
 >                  manyTill anyChar newline >>
 >                  return name
 
@@ -303,7 +307,7 @@ We'll cycle the colors we're using indefinitely for as many rules as we need.
 > spectral  ::  [Color]
 > spectral  =   [  "#9E0142", "#D53E4F", "#F46D43", "#FDAE61",
 >                  "#FEE08B", "#FFFFBF", "#E6F598", "#ABDDA4",
->                  "#66C2A5", "#3288BD", "#5E4FA2"]
+>                  "#66C2A5", "#3288BD", "#5E4FA2" ]
 
 This program is just a simple filter that accepts an iptables dump as input and
 outputs a Graphviz representation.
@@ -334,7 +338,8 @@ between them based on the rules in all of the chains.
 
 > graphviz     ::  [Chain] -> IO ()
 > graphviz cs  =   putStr $ unlines
->                  [  "// Generated by gressgraph <http://jekor.com/gressgraph/>",
+>                  [  "// Generated by gressgraph v" ++
+>                     (show gressgraphVersion) ++ " <http://jekor.com/gressgraph/>",
 >                     "",
 >                     "digraph gressgraph {",
 >                     graphAttributes,
@@ -390,18 +395,18 @@ any confusion for someone viewing the graph.
 
 We also set a height for the node to keep the edges on it from bunching up.
 
-> addressNode            ::  (Address, Float) -> String
-> addressNode (a, size)  =   showAddress a ++ " [label=\"" ++ snd a ++
->                            "\" height=" ++ show size ++ "]"
+> addressNode                ::  (Address, Float) -> String
+> addressNode (a, diameter)  =   showAddress a ++ " [label=\"" ++ snd a ++
+>                                "\" height=" ++ show diameter ++ "]"
 
 We set the width in addition to the height for interface nodes. This gives a
 visual cue for distinguishing between interfaces and addresses. This is a
 little risky because we may set a width that's too small for the label of the
 node, but interface names are usually very short. 
 
-> interfaceNode            ::  (String, Float) -> String
-> interfaceNode (i, size)  =   quote i ++ " [height=" ++ show size ++
->                              " width=" ++ show size ++ "]"
+> interfaceNode                ::  (String, Float) -> String
+> interfaceNode (i, diameter)  =   quote i ++ " [height=" ++ show diameter ++
+>                                  " width=" ++ show diameter ++ "]"
 
 To keep the interface nodes in a circular configuration, we need to connect
 each of them to an invisible root (hub) node.
@@ -424,19 +429,23 @@ size (in inches).
 
 $\frac{1}{4}$ inch is about the size that Graphviz uses as a default height.
 
-> minimumSize = 0.25
+> minimumSize  ::  Float
+> minimumSize  =   0.25
 
 By default, Graphviz places nodes too close together when using the twopi
 layout algorithm.
 
-> rankSep = minimumSize * 12.0
+> rankSep  ::  Float
+> rankSep  =   minimumSize * 12.0
 
 We want a background color upon which colors will stand out well. Grey is best
 for that.
 
-> backgroundColor = "#808080"
+> backgroundColor  ::  String
+> backgroundColor  =   "#808080"
 
-> graphAttributes = "graph [ranksep=" ++ show rankSep ++
->                   " bgcolor=\"" ++ backgroundColor ++ "\"]"
+> graphAttributes  ::  String
+> graphAttributes  =   "graph [ranksep=" ++ show rankSep ++
+>                      " bgcolor=\"" ++ backgroundColor ++ "\"]"
 
 \end{document}

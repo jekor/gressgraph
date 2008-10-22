@@ -1,6 +1,6 @@
-gressgraph
+gressgraph v0.2
 
-2008-03-02
+2008-10-21
 
 Description
 ===========
@@ -29,7 +29,7 @@ If compiling from source:
 Usage
 =====
 
-$ iptables -L -vx | ingressgraph > iptables.twopi
+$ iptables -L -vx | gressgraph > iptables.twopi
 $ twopi -Tsvg iptables.twopi > iptables.svg
 
 See gressgraph.pdf for more detailed documentation, including a description of
@@ -49,9 +49,8 @@ Building
 $ make
 $ make test
 
-Or if you want to build components individually:
+If you didn't receive gressgraph.pdf:
 
-$ make gressgraph
 $ make doc
 
 Manifest
@@ -60,6 +59,13 @@ gressgraph.lhs       - the literate Haskell source to the program
 test-iptables-output - example iptables output (used for testing the program)
 Makefile             - a GNU makefile for building the components
 COPYING              - the text to the GNU GPLv3
+
+Troubleshooting
+===============
+* The program hangs after outputting "// Interfaces".
+
+gressgraph is waiting for input. Make sure you've sent it something on its
+stdin (it does not take a file as a commandline argument).
 
 Modifications/Source
 ====================
