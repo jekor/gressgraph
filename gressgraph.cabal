@@ -19,5 +19,5 @@ tested-with:         GHC == 7.6.1
 executable gressgraph
   main-is:             gressgraph.lhs
   -- other-modules:       
-  build-depends:       base ==4.6.*,
+  build-depends:       base >= 4,
                        parsec
