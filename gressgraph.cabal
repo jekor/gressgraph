@@ -7,7 +7,7 @@ synopsis:            Visualize Your iptables Firewall
 -- description:         
 homepage:            http://jekor.com/gressgraph
 license:             GPL-3
-license-file:        COPYING
+license-file:        LICENSE
 author:              Chris Forno
 maintainer:          jekor@jekor.com
 -- copyright:           
