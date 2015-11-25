@@ -6,11 +6,11 @@ version:             0.2.0
 synopsis:            Visualize Your iptables Firewall
 -- description:         
 homepage:            http://jekor.com/gressgraph
-license:             GPL-3
+license:             MIT
 license-file:        LICENSE
 author:              Chris Forno
 maintainer:          jekor@jekor.com
--- copyright:           
+copyright:           2008, 2009, 2013, 2014, 2015 Chris Forno
 category:            Graphics
 build-type:          Simple
 cabal-version:       >=1.8
