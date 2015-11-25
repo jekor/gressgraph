@@ -47,3 +47,13 @@ $ make doc
 
 gressgraph is waiting for input. Make sure you've sent it something on its
 stdin (it does not take a file as a commandline argument).
+
+# Building
+
+I build gressgraph with [Nix](http://nixos.org/nix/) to try to ensure reproducible builds:
+
+```
+nix-build dev.nix
+```
+
+`default.nix` is for inclusion in a top-level file (such as `all-packages.nix`). `dev.nix` builds gressgraph with a fixed version of nixpkgs, providing stability at the cost of inflating the nix store.

@@ -36,7 +36,6 @@ Glasgow extensions. It's been tested with {\sc Ghc} 6.8.2.
 We'll be using Parsec for parsing the iptables output.
 
 > import Text.ParserCombinators.Parsec
-> import Text.ParserCombinators.Parsec.Prim
 
 > gressgraphVersion  ::  Float
 > gressgraphVersion  =   0.2
