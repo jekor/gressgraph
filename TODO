@@ -1,7 +1,5 @@
 * Copy all gressgraph files off of the linode server (from the backup dir) for analysis.
 * Add copyright/license notice to the literate Haskell file (and resulting PDF).
-* Cabalize.
 * Show parse errors in the web interface.
-* Switch to parsing iptables-save output. (evaluate)
 * Switch to using the Graphviz Haskell library for output. (evaluate)
 * Fix font sizes on web-based version.
