@@ -14,6 +14,14 @@ If compiling from source:
 * lhs2TeX (>= 1.11)
 * GNU Make
 
+
+For Ubuntu Server 16.04 run the following to install prerequisites
+
+```
+$ sudo apt install iptables graphviz make lhs2tex ghc libghc-parsec3-dev
+```
+
+
 ## Usage
 
 ```ShellSession
