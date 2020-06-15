@@ -1,7 +1,6 @@
 name:                gressgraph
 version:             0.2.1
 synopsis:            Visualize Your iptables Firewall
--- description:         
 homepage:            http://jekor.com/gressgraph
 license:             MIT
 license-file:        LICENSE
@@ -11,11 +10,10 @@ copyright:           2008, 2009, 2013, 2014, 2015 Chris Forno
 category:            Graphics
 build-type:          Simple
 cabal-version:       >=1.8
-tested-with:         GHC == 7.10.2
+tested-with:         GHC == 8.6.5
 
 executable gressgraph
   main-is:             gressgraph.lhs
-  -- other-modules:       
   build-depends:       base >= 4,
                        parsec
   ghc-options:         -Wall -fno-warn-type-defaults -fno-warn-unused-do-bind -fno-warn-missing-signatures -O2

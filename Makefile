@@ -1,32 +1,25 @@
-PROGRAM = gressgraph
-DIST := gressgraph-0.2
+APP=gressgraph
+BIN=dist/build/$(APP)/$(APP)
 
-all : $(PROGRAM)
+all : $(BIN)
 
-gressgraph : $(PROGRAM).lhs
-	ghc -Wall -package parsec -fglasgow-exts -o $(PROGRAM) $<
+dist/setup-config : $(APP).cabal
+	runhaskell Setup.hs configure
 
-doc : $(PROGRAM).lhs
-	lhs2TeX $< > $(PROGRAM).tex
-	pdflatex $(PROGRAM).tex
+$(BIN) : dist/setup-config $(APP).lhs
+	runhaskell Setup.hs build
+	@touch $@ # cabal doesn't always update the build (if it doesn't need to)
 
-test : $(PROGRAM) test-iptables-output
-	./$(PROGRAM) < test-iptables-output > test-graph.twopi
+.PHONY : doc test clean
+doc : $(APP).lhs
+	lhs2TeX $< > $(APP).tex
+	pdflatex $(APP).tex
+
+test : $(BIN) test-iptables-output
+	$(BIN) < test-iptables-output > test-graph.twopi
 	twopi -Tsvg test-graph.twopi > test-graph.svg
 
-sloc : $(PROGRAM).lhs
-	lhs2TeX --code $< | grep --invert-match '^ *$$' | wc --lines
-
 clean :
-	rm $(PROGRAM).tex $(PROGRAM).aux $(PROGRAM).log $(PROGRAM).ptb
-	rm $(PROGRAM).hi $(PROGRAM).o
+	-rm $(APP).tex $(APP).aux $(APP).log $(APP).ptb
+	-rm -rf dist
 	rm test-graph.twopi test-graph.svg
-
-dist:
-#	darcs dist would be nice, but we want to add gressgraph.pdf
-	mkdir $(DIST)
-	for f in `darcs query manifest`; do cp $$f $(DIST)/; done
-#       append the documentation
-	cp gressgraph.pdf $(DIST)/
-	tar czvf $(DIST).tar.gz $(DIST)/
-	rm -rf $(DIST)/

@@ -1,7 +1,8 @@
 # gressgraph - Visualize Your Firewall
 
-Visualize your firewall by graphing its rules. (See the example graph if this
-doesn't make sense yet.)
+Visualize your firewall by graphing its rules.
+
+Warning: This was only tested on small firewall rulesets.
 
 ## Requirements
 
